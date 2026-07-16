@@ -22,13 +22,6 @@
 4. 点击 **获取** 查看直链地址，或点击 **一键复制** 一步到位
 5. 复制得到的 CDN 链接，即可在播放器或下载工具中使用
 
-## 实现原理
-
-1. 从视频URL中提取 `BV` 号及可选的 `p`（分P）参数
-2. 调用 [B站View API](https://api.bilibili.com/x/web-interface/view) 获取 `aid` 和 `cid`
-3. 调用 [B站Playurl API](https://api.bilibili.com/x/player/playurl) 获取直链CDN地址
-4. 返回可直接访问的媒体文件链接（`.mp4` / `.flv`）
-
 ## 下载
 
 从 [GitHub Releases](../../releases) 下载最新版 `bilicdn.exe`。
