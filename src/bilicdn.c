@@ -211,6 +211,12 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
         break;
     case WM_CTLCOLORDLG:
         return (INT_PTR)GetStockObject(WHITE_BRUSH);
+    case WM_CTLCOLOREDIT:
+        SetBkColor((HDC)wp, RGB(255, 255, 255));
+        return (INT_PTR)GetStockObject(WHITE_BRUSH);
+    case WM_CTLCOLORBTN:
+        SetBkColor((HDC)wp, RGB(255, 255, 255));
+        return (INT_PTR)GetStockObject(WHITE_BRUSH);
     case WM_CLOSE: EndDialog(hDlg, 0); break;
     case WM_INITDIALOG: {
         HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APPLICATION));
