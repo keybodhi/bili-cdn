@@ -81,8 +81,6 @@ static int http_get(const WCHAR *host, const WCHAR *path, char *body, int maxbod
     *errCode = 0;
     HINTERNET hs = WinHttpOpen(L"Mozilla/5.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!hs) { *errCode = GetLastError(); return 0; }
-    DWORD proto = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
-    WinHttpSetOption(hs, WINHTTP_OPTION_SECURE_PROTOCOLS, &proto, sizeof(proto));
     HINTERNET hc = WinHttpConnect(hs, host, INTERNET_DEFAULT_HTTPS_PORT, 0);
     if (!hc) { *errCode = GetLastError(); WinHttpCloseHandle(hs); return 0; }
     HINTERNET hr = WinHttpOpenRequest(hc, L"GET", path, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
