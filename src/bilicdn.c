@@ -208,7 +208,8 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
             SetBkMode((HDC)wp, TRANSPARENT);
             return (INT_PTR)GetStockObject(NULL_BRUSH);
         }
-        break;
+        SetBkMode((HDC)wp, TRANSPARENT);
+        return (INT_PTR)GetStockObject(NULL_BRUSH);
     case WM_CTLCOLORDLG:
         return (INT_PTR)GetStockObject(WHITE_BRUSH);
     case WM_CTLCOLOREDIT:
