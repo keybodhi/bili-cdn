@@ -213,6 +213,19 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_INITDIALOG: {
         HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APPLICATION));
         if (icon) { SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)icon); SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)icon); }
+        // Fluent: rounded corners + mica backdrop (Win11, harmless on Win10)
+        HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
+        if (dwm) {
+            typedef HRESULT (WINAPI *DwmSetWinAttr_t)(HWND, DWORD, LPCVOID, DWORD);
+            DwmSetWinAttr_t pDwm = (DwmSetWinAttr_t)GetProcAddress(dwm, "DwmSetWindowAttribute");
+            if (pDwm) {
+                int val;
+                val = 2; pDwm(hDlg, 33, &val, sizeof(val));  // DWMWA_WINDOW_CORNER_PREFERENCE = ROUND
+                val = 2; pDwm(hDlg, 38, &val, sizeof(val));  // DWMWA_SYSTEMBACKDROP_TYPE = Mica
+                val = 1; pDwm(hDlg, 20, &val, sizeof(val));  // DWMWA_USE_IMMERSIVE_DARK_MODE
+            }
+            FreeLibrary(dwm);
+        }
         break;
     }
     }
