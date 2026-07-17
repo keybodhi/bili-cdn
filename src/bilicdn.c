@@ -77,16 +77,18 @@ static unsigned long long json_intval(const char *j, const char *key) {
 }
 
 // ── WinHTTP ────────────────────────────────────────────
-static int http_get(const WCHAR *host, const WCHAR *path, char *body, int maxbody, int *errCode) {
-    *errCode = 0;
+static int http_get(const WCHAR *host, const WCHAR *path, char *body, int maxbody, int *errCode, int *errStep) {
+    *errCode = 0; *errStep = 0;
     HINTERNET hs = WinHttpOpen(L"Mozilla/5.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-    if (!hs) { *errCode = GetLastError(); return 0; }
+    if (!hs) { *errCode = GetLastError(); *errStep = 1; return 0; }
+    DWORD t = 30000; WinHttpSetTimeouts(hs, t, t, t, t);
+    DWORD proto = 0x2A80; WinHttpSetOption(hs, WINHTTP_OPTION_SECURE_PROTOCOLS, &proto, sizeof(proto));
     HINTERNET hc = WinHttpConnect(hs, host, INTERNET_DEFAULT_HTTPS_PORT, 0);
-    if (!hc) { *errCode = GetLastError(); WinHttpCloseHandle(hs); return 0; }
+    if (!hc) { *errCode = GetLastError(); *errStep = 2; WinHttpCloseHandle(hs); return 0; }
     HINTERNET hr = WinHttpOpenRequest(hc, L"GET", path, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
-    if (!hr) { *errCode = GetLastError(); WinHttpCloseHandle(hc); WinHttpCloseHandle(hs); return 0; }
-    if (!WinHttpSendRequest(hr, L"Referer: https://www.bilibili.com\r\n", -1, WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) { *errCode = GetLastError(); WinHttpCloseHandle(hr); WinHttpCloseHandle(hc); WinHttpCloseHandle(hs); return 0; }
-    if (!WinHttpReceiveResponse(hr, NULL)) { *errCode = GetLastError(); WinHttpCloseHandle(hr); WinHttpCloseHandle(hc); WinHttpCloseHandle(hs); return 0; }
+    if (!hr) { *errCode = GetLastError(); *errStep = 3; WinHttpCloseHandle(hc); WinHttpCloseHandle(hs); return 0; }
+    if (!WinHttpSendRequest(hr, L"Accept: application/json\r\n", -1, WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) { *errCode = GetLastError(); *errStep = 4; WinHttpCloseHandle(hr); WinHttpCloseHandle(hc); WinHttpCloseHandle(hs); return 0; }
+    if (!WinHttpReceiveResponse(hr, NULL)) { *errCode = GetLastError(); *errStep = 5; WinHttpCloseHandle(hr); WinHttpCloseHandle(hc); WinHttpCloseHandle(hs); return 0; }
     int total = 0; DWORD avail, read;
     while (WinHttpQueryDataAvailable(hr, &avail) && avail > 0) {
         DWORD tr = avail; if (total + (int)tr >= maxbody - 1) tr = maxbody - 1 - total;
@@ -110,8 +112,8 @@ static int resolve_bili(const WCHAR *input, WCHAR *result, int maxres) {
     // view API
     vbuf[0] = 0;
     wsprintfW(tmp, L"/x/web-interface/view?bvid=%s", bvid);
-    int err; int vlen = http_get(L"api.bilibili.com", tmp, vbuf, 8192, &err);
-    if (vlen == 0) { wsprintfW(result, L"view接口失败 err=%d", err); return w_len(result); }
+    int err, step; int vlen = http_get(L"api.bilibili.com", tmp, vbuf, 8192, &err, &step);
+    if (vlen == 0) { wsprintfW(result, L"view接口失败 err=%d step=%d", err, step); return w_len(result); }
 
     unsigned long long code = json_intval(vbuf, "code");
     if (code != 0) { wsprintfW(result, L"view返回code=%d", (int)code); return w_len(result); }
@@ -144,8 +146,8 @@ static int resolve_bili(const WCHAR *input, WCHAR *result, int maxres) {
     pfx = "&qn=64&platform=html5&otype=json&high_quality=1"; while (*pfx) *up++ = *pfx++;
     *up = 0;
     a2w(url_buf, tmp, 512);
-    int plen = http_get(L"api.bilibili.com", tmp, pbuff, 8192, &err);
-    if (plen == 0) { wsprintfW(result, L"playurl接口失败 err=%d", err); return w_len(result); }
+    int plen = http_get(L"api.bilibili.com", tmp, pbuff, 8192, &err, &step);
+    if (plen == 0) { wsprintfW(result, L"playurl接口失败 err=%d step=%d", err, step); return w_len(result); }
 
     unsigned long long pcode = json_intval(pbuff, "code");
     if (pcode != 0) { wsprintfW(result, L"playurl返回code=%d", (int)pcode); return w_len(result); }
@@ -168,27 +170,52 @@ static WCHAR *read_clipboard(HWND h, WCHAR *buf, int max) {
 }
 static void paste_to_edit(HWND h) { WCHAR buf[2048]; if (read_clipboard(h, buf, 2048)) SetDlgItemTextW(h, IDC_URL, buf); }
 static void copy_to_clip(HWND h, const WCHAR *s) {
-    if (!OpenClipboard(h)) return; EmptyClipboard(); int n = w_len(s) + 1;
+    int n = w_len(s) + 1;
     HGLOBAL m = GlobalAlloc(GMEM_MOVEABLE, n * sizeof(WCHAR));
-    if (m) { WCHAR *w = (WCHAR *)GlobalLock(m); if (w) { w_copy(w, s); GlobalUnlock(m); } SetClipboardData(CF_UNICODETEXT, m); }
+    if (!m) return;
+
+    WCHAR *w = (WCHAR *)GlobalLock(m);
+    if (w) {
+        w_copy(w, s);
+        GlobalUnlock(m);
+    } else {
+        GlobalFree(m);
+        return;
+    }
+
+    if (!OpenClipboard(h)) {
+        GlobalFree(m);
+        return;
+    }
+    EmptyClipboard();
+    SetClipboardData(CF_UNICODETEXT, m);
     CloseClipboard();
 }
+
 
 // ── dialog ─────────────────────────────────────────────
 static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_COMMAND:
-        if (LOWORD(wp) == IDC_PASTE) { paste_to_edit(hDlg); }
+        if (LOWORD(wp) == IDC_PASTE) { paste_to_edit(hDlg); return TRUE; }
         if (LOWORD(wp) == IDC_COPY) {
             WCHAR result[4096]; result[0] = 0;
             GetDlgItemTextW(hDlg, IDC_RESULT, result, 4096);
-            if (result[0]) copy_to_clip(hDlg, result);
+            if (result[0]) { copy_to_clip(hDlg, result); SendDlgItemMessageW(hDlg, IDC_RESULT, EM_SETSEL, 0, -1); // 全选 
+            
+            }
+            return TRUE;
         }
         if (LOWORD(wp) == IDC_PARSE) {
             WCHAR input[2048], result[4096]; input[0] = 0; result[0] = 0;
             GetDlgItemTextW(hDlg, IDC_URL, input, 2048);
             int r = resolve_bili(input, result, 4096);
             SetDlgItemTextW(hDlg, IDC_RESULT, result);
+            // 将光标移到文本开头（无选中）
+            SendDlgItemMessageW(hDlg, IDC_RESULT, EM_SETSEL, 0, 0);
+            // 滚动视图使光标可见，即回到顶部
+            SendDlgItemMessageW(hDlg, IDC_RESULT, EM_SCROLLCARET, 0, 0);
+            return TRUE;
         }
         if (LOWORD(wp) == IDC_QUICK) {
             WCHAR input[2048], result[4096]; input[0] = 0; result[0] = 0;
@@ -196,18 +223,38 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
             SetDlgItemTextW(hDlg, IDC_URL, input);
             int r = resolve_bili(input, result, 4096);
             SetDlgItemTextW(hDlg, IDC_RESULT, result);
-            if (r > 0 && result[0] == 'h' && result[1] == 't' && result[2] == 't' && result[3] == 'p')
+            if (r > 0 && result[0] == 'h' && result[1] == 't' && result[2] == 't' && result[3] == 'p') {
                 copy_to_clip(hDlg, result);
+            }
+            SendDlgItemMessageW(hDlg, IDC_RESULT, EM_SETSEL, 0, 0);
+                // 滚动视图使光标可见，即回到顶部
+            SendDlgItemMessageW(hDlg, IDC_RESULT, EM_SCROLLCARET, 0, 0);
+            return TRUE;
         }
         break;
+    // case WM_CTLCOLORSTATIC:
+    //     if ((HWND)lp == GetDlgItem(hDlg, IDC_TIP)) {
+    //         SetTextColor((HDC)wp, RGB(0x88, 0x88, 0x88));
+    //         SetBkMode((HDC)wp, TRANSPARENT);
+    //         return (INT_PTR)GetStockObject(NULL_BRUSH);
+    //     }
+    //     SetBkMode((HDC)wp, TRANSPARENT);
+    //     return (INT_PTR)GetStockObject(NULL_BRUSH);
     case WM_CTLCOLORSTATIC:
-        if ((HWND)lp == GetDlgItem(hDlg, IDC_TIP)) {
-            SetTextColor((HDC)wp, RGB(0x88, 0x88, 0x88));
-            SetBkMode((HDC)wp, TRANSPARENT);
-            return (INT_PTR)GetStockObject(NULL_BRUSH);
-        }
+    if ((HWND)lp == GetDlgItem(hDlg, IDC_TIP)) {
+        SetTextColor((HDC)wp, RGB(0x88, 0x88, 0x88));
         SetBkMode((HDC)wp, TRANSPARENT);
         return (INT_PTR)GetStockObject(NULL_BRUSH);
+    }
+    if ((HWND)lp == GetDlgItem(hDlg, IDC_RESULT)) {
+        // 只读编辑框必须用不透明背景，否则旧内容不会擦除
+        SetBkColor((HDC)wp, RGB(255, 255, 255));
+        SetBkMode((HDC)wp, OPAQUE);
+        return (INT_PTR)GetStockObject(WHITE_BRUSH);
+    }
+    // 其他静态控件保持透明（如果有的话）
+    SetBkMode((HDC)wp, TRANSPARENT);
+    return (INT_PTR)GetStockObject(NULL_BRUSH);
     case WM_CTLCOLORDLG:
         return (INT_PTR)GetStockObject(WHITE_BRUSH);
     case WM_CTLCOLOREDIT:
@@ -217,6 +264,7 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
         SetBkColor((HDC)wp, RGB(255, 255, 255));
         return (INT_PTR)GetStockObject(WHITE_BRUSH);
     case WM_CLOSE: EndDialog(hDlg, 0); break;
+    
     case WM_INITDIALOG: {
         HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APPLICATION));
         if (icon) { SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)icon); SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)icon); }
@@ -232,9 +280,23 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
             FreeLibrary(dwm);
         }
         break;
+    };
+    case WM_DESTROY:
+{
+    // 释放图标
+    HICON hIconBig   = (HICON)SendMessageW(hDlg, WM_GETICON, ICON_BIG, 0);
+    HICON hIconSmall = (HICON)SendMessageW(hDlg, WM_GETICON, ICON_SMALL, 0);
+    if (hIconBig)   DestroyIcon(hIconBig);
+    if (hIconSmall) DestroyIcon(hIconSmall);
+
+    // 释放提示字体
+    HWND hTip = GetDlgItem(hDlg, IDC_TIP);
+    HFONT hFont = (HFONT)SendMessageW(hTip, WM_GETFONT, 0, 0);
+    if (hFont) DeleteObject(hFont);
+    break;
+}
     }
-    }
-    return 0;
+    return FALSE;
 }
 
 void __stdcall Entry(void) {
