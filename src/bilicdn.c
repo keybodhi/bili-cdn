@@ -178,6 +178,7 @@ static void copy_to_clip(HWND h, const WCHAR *s) {
 
 // ── dialog ─────────────────────────────────────────────
 static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
+    static HBRUSH hAccentBr;
     switch (msg) {
     case WM_COMMAND:
         if (LOWORD(wp) == IDC_PASTE) { paste_to_edit(hDlg); }
@@ -209,8 +210,16 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
             return (INT_PTR)GetStockObject(NULL_BRUSH);
         }
         break;
+    case WM_CTLCOLORBTN:
+        if ((HWND)lp == GetDlgItem(hDlg, IDC_QUICK)) {
+            SetTextColor((HDC)wp, GetSysColor(COLOR_HIGHLIGHTTEXT));
+            SetBkMode((HDC)wp, TRANSPARENT);
+            return (INT_PTR)hAccentBr;
+        }
+        break;
     case WM_CLOSE: EndDialog(hDlg, 0); break;
     case WM_INITDIALOG: {
+        hAccentBr = CreateSolidBrush(GetSysColor(COLOR_HIGHLIGHT));
         HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APPLICATION));
         if (icon) { SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)icon); SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)icon); }
         // Fluent: rounded corners + mica backdrop (Win11, harmless on Win10)
