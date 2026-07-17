@@ -209,6 +209,8 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
             return (INT_PTR)GetStockObject(NULL_BRUSH);
         }
         break;
+    case WM_CTLCOLORDLG:
+        return (INT_PTR)GetStockObject(WHITE_BRUSH);
     case WM_CLOSE: EndDialog(hDlg, 0); break;
     case WM_INITDIALOG: {
         HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APPLICATION));
@@ -216,12 +218,12 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
         // tip label: smaller font
         HFONT hTipFont = CreateFontW(14, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI");
         if (hTipFont) { SendMessageW(GetDlgItem(hDlg, IDC_TIP), WM_SETFONT, (WPARAM)hTipFont, TRUE); }
-        // Fluent: rounded corners + mica (Win11, silent fallback on Win10)
+        // Fluent: rounded corners (Win11, silent fallback on Win10)
         HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
         if (dwm) {
             typedef HRESULT (WINAPI *DSA_t)(HWND, DWORD, LPCVOID, DWORD);
             DSA_t pDSA = (DSA_t)GetProcAddress(dwm, "DwmSetWindowAttribute");
-            if (pDSA) { int v; v = 2; pDSA(hDlg, 33, &v, 4); pDSA(hDlg, 38, &v, 4); }
+            if (pDSA) { int v = 2; pDSA(hDlg, 33, &v, 4); }
             FreeLibrary(dwm);
         }
         break;
