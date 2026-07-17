@@ -223,7 +223,7 @@ static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
         HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APPLICATION));
         if (icon) { SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)icon); SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)icon); }
         // tip label: smaller font
-        HFONT hTipFont = CreateFontW(14, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+        HFONT hTipFont = CreateFontW(14, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft YaHei UI");
         if (hTipFont) { SendMessageW(GetDlgItem(hDlg, IDC_TIP), WM_SETFONT, (WPARAM)hTipFont, TRUE); }
         // Fluent: rounded corners (Win11, silent fallback on Win10)
         HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
