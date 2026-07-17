@@ -180,19 +180,33 @@ static void copy_to_clip(HWND h, const WCHAR *s) {
 static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_COMMAND:
-        if (LOWORD(wp) == IDC_PASTE) paste_to_edit(hDlg);
-        if (LOWORD(wp) == IDC_GET || LOWORD(wp) == IDC_QUICK) {
+        if (LOWORD(wp) == IDC_PASTE) { paste_to_edit(hDlg); }
+        if (LOWORD(wp) == IDC_COPY) {
+            WCHAR result[4096]; result[0] = 0;
+            GetDlgItemTextW(hDlg, IDC_RESULT, result, 4096);
+            if (result[0]) copy_to_clip(hDlg, result);
+        }
+        if (LOWORD(wp) == IDC_PARSE) {
             WCHAR input[2048], result[4096]; input[0] = 0; result[0] = 0;
-            if (LOWORD(wp) == IDC_QUICK) {
-                GetDlgItemTextW(hDlg, IDC_URL, input, 2048);
-                if (input[0] == 0) { read_clipboard(hDlg, input, 2048); SetDlgItemTextW(hDlg, IDC_URL, input); }
-            } else {
-                GetDlgItemTextW(hDlg, IDC_URL, input, 2048);
-            }
+            GetDlgItemTextW(hDlg, IDC_URL, input, 2048);
             int r = resolve_bili(input, result, 4096);
             SetDlgItemTextW(hDlg, IDC_RESULT, result);
-            if (LOWORD(wp) == IDC_QUICK && r > 0 && result[0] == 'h' && result[1] == 't' && result[2] == 't' && result[3] == 'p')
+        }
+        if (LOWORD(wp) == IDC_QUICK) {
+            WCHAR input[2048], result[4096]; input[0] = 0; result[0] = 0;
+            read_clipboard(hDlg, input, 2048);
+            SetDlgItemTextW(hDlg, IDC_URL, input);
+            int r = resolve_bili(input, result, 4096);
+            SetDlgItemTextW(hDlg, IDC_RESULT, result);
+            if (r > 0 && result[0] == 'h' && result[1] == 't' && result[2] == 't' && result[3] == 'p')
                 copy_to_clip(hDlg, result);
+        }
+        break;
+    case WM_CTLCOLORSTATIC:
+        if ((HWND)lp == GetDlgItem(hDlg, IDC_TIP)) {
+            SetTextColor((HDC)wp, RGB(0x88, 0x88, 0x88));
+            SetBkMode((HDC)wp, TRANSPARENT);
+            return (INT_PTR)GetStockObject(NULL_BRUSH);
         }
         break;
     case WM_CLOSE: EndDialog(hDlg, 0); break;
